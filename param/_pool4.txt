@@ -1,0 +1,24 @@
+Model_Name = vgg
+Layer_Type = MAXPOOL
+Layer_Number = pool4:0 
+
+Input_parameter{
+  input_batch = 32
+  input_x =  28
+  input_y =  28
+  input_channel =  512
+}
+
+Output_parameter{
+  output_batch = 32
+  output_x =  14
+  output_y =  14
+  output_channel =  512
+}
+
+Weight_parameter{
+  ksize_x = 2
+  ksize_y =  2
+  stride_x = 2
+  stride_y =  2
+}

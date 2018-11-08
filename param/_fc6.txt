@@ -1,0 +1,18 @@
+Model_Name = vgg
+Layer_Type = RELEFC
+Layer_Number = fc6:0 
+
+Input_parameter{
+  input_batch = 32
+  input_length =  25088
+}
+
+Output_parameter{
+  output_batch = 32
+  output_length =  4096
+}
+
+Weight_parameter{
+  dimension_1 = 25088
+  dimension_2 =  4096
+}
