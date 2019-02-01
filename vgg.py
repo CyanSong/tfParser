@@ -1,5 +1,6 @@
 from  datetime import datetime
 import tensorflow as tf
+
 import math
 import time
 
@@ -34,8 +35,7 @@ def fc_op(input_op,name,n_out,p):
 
 # 定义最大池化层
 def mpool_op(input_op,name,kh,kw,dh,dw):
-    m = tf.nn.max_pool(input_op,ksize=[1,kh,kw,1],strides=[1,dh,dw,1],padding='SAME',name=name)
-    return m
+    return tf.nn.max_pool(input_op,ksize=[1,kh,kw,1],strides=[1,dh,dw,1],padding='SAME',name=name)
 
 #定义网络结构
 def inference_op(input_op,keep_prob):
