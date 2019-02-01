@@ -4,17 +4,20 @@ import os
 from lark.tree import pydot__tree_to_png  # Just a neat utility function
 import shutil
 
+
+network_name='alexnet'
+python_path = ''
+
 # parameters
 convPath = "param/conv.txt"
 maxPoolPath = "param/maxpool.txt"
 reluFcPath = "param/relufc.txt"
 rnnPath = "param/rnn.txt"
 
-# 目前未考虑的bug：
-# 3.other api of rnn and fc
-# 4.换行问题
 
-def extractNetwork(tfFile, debug=False):
+
+
+def extractNetwork(tfFile, python_path='',debug=False):
     def getTab(line):
         i = 0
         while i != len(line):
@@ -156,21 +159,44 @@ def extractNetwork(tfFile, debug=False):
 
         with open('tmpFile.py', 'w', encoding="utf-8") as f:
             f.write(newFile)
-        os.system('C:\\Users\\user\\Anaconda3\\envs\\tf\\python.exe tmpFile.py')
+        os.system(python_path+'python.exe tmpFile.py')
         if not debug:
             os.remove("tmpFile.py")
 
     def test():
-        tree = EvalExpressions().transform(l.parse("output = tf.nn.conv2d(input_op, kernel,(1,dh,dw,1),padding='SAME')"))
+        tree = EvalExpressions().transform(
+            l.parse("output = tf.nn.conv2d(input_op, kernel,(1,dh,dw,1),padding='SAME')"))
 
         pydot__tree_to_png(tree, "conv2d.png")
-    #test()
+
+    # test()
     main()
 
 
 def modify_format(modelName):
+    def replace_param(origin, new):
+        for key in new.keys():
+            origin[key] = new[key]
+        return origin
+
     def transform(d):
         return str(json.dumps(d, indent=2)).replace(',', '').replace('"', '').replace(':', ' =')
+
+    def write_file(file_name, model_name, layer_type, layer_number, input_param, output_param, weight_param,
+                   hidden_param):
+        default_input_param = dict().fromkeys(['input_batch', 'input_x', 'input_y', 'input_channel'], 1)
+        default_output_param = dict().fromkeys(['output_batch', 'output_x', 'output_y', 'output_channel'], 1)
+        default_hidden_param = dict().fromkeys(['hidden_x', 'hidden_y', 'hidden_channel'], 0)
+        default_weight_param = dict().fromkeys(
+            ['weight_x', 'weight_y', 'weight_channel', 'weight_number', 'stride_x', 'stride_y'], 1)
+        with open(file_name, 'w') as f2:
+            f2.write('Model_Name = ' + model_name + '\n')
+            f2.write('Layer_Type =' + layer_type + '\n')
+            f2.write('Layer_Number = ' + layer_number + '\n\n')
+            f2.write('Input_parameter' + transform(replace_param(default_input_param,input_param)) + '\n\n')
+            f2.write('Output_parameter' + transform(replace_param(default_output_param,output_param)) + '\n\n')
+            f2.write('Weight_parameter' + transform(replace_param(default_weight_param,weight_param)) + '\n\n')
+            f2.write('hidden_param' + transform(replace_param(default_hidden_param,hidden_param)))
 
     def modify_conv():
         with open(convPath, 'r') as f:
@@ -180,19 +206,14 @@ def modify_format(modelName):
                 inputShape = inputShape[2:-2].split(',')
                 kernelShape = kernelShape[2:-2].split(',')
                 stride = stride[2:-2].split(',')
-                Input_param = dict(zip(['input_batch', 'input_x', 'input_y'], inputShape))
+                Input_param = dict(zip(['input_batch', 'input_x', 'input_y', 'input_channel'], inputShape))
                 Output_param = dict(zip(['output_batch', 'output_x', 'output_y', 'output_channel'], outputShape))
                 Weight_param = dict(
                     zip(['weight_x', 'weight_y', 'weight_channel', 'weight_number', 'stride_x', 'stride_y'],
                         kernelShape + stride))
                 filename = 'param/_' + name.replace('/', '').replace(' ', '')[0:-2] + '.txt'
-                with open(filename, 'w') as f2:
-                    f2.write('Model_Name = ' + modelName + '\n')
-                    f2.write('Layer_Type = CONV\n')
-                    f2.write('Layer_Number = ' + name.split('/')[0] + '\n\n')
-                    f2.write('Input_parameter' + transform(Input_param) + '\n\n')
-                    f2.write('Output_parameter' + transform(Output_param) + '\n\n')
-                    f2.write('Weight_parameter' + transform(Weight_param))
+                write_file(filename, modelName, 'CONV', name.split('/')[0], Input_param, Output_param, Weight_param,
+                           dict())
 
     def modify_maxpool():
         with open(maxPoolPath, 'r') as f:
@@ -202,18 +223,12 @@ def modify_format(modelName):
                 inputShape = inputShape[2:-2].split(',')
                 kernelShape = kernelShape[2:-2].split(',')
                 stride = stride[2:-2].split(',')
-
                 Input_param = dict(zip(['input_batch', 'input_x', 'input_y', 'input_channel'], inputShape))
                 Output_param = dict(zip(['output_batch', 'output_x', 'output_y', 'output_channel'], outputShape))
-                Weight_param = dict(zip(['ksize_x', 'ksize_y', 'stride_x', 'stride_y'], kernelShape + stride))
+                Weight_param = dict(zip(['weight_x', 'weight_y', 'stride_x', 'stride_y'], kernelShape + stride))
                 filename = 'param/_' + name.replace('/', '').replace(' ', '')[0:-2] + '.txt'
-                with open(filename, 'w') as f2:
-                    f2.write('Model_Name = ' + modelName + '\n')
-                    f2.write('Layer_Type = MAXPOOL\n')
-                    f2.write('Layer_Number = ' + name.split('/')[0] + '\n\n')
-                    f2.write('Input_parameter' + transform(Input_param) + '\n\n')
-                    f2.write('Output_parameter' + transform(Output_param) + '\n\n')
-                    f2.write('Weight_parameter' + transform(Weight_param))
+                write_file(filename,modelName,'MAXPOOL',name.split('/')[0],Input_param,Output_param,Weight_param,dict())
+
 
     def modify_relufc():
         with open(reluFcPath, 'r') as f:
@@ -228,13 +243,8 @@ def modify_format(modelName):
                 Output_param['output_batch'], Output_param['output_length'] = outputShape
                 Weight_param['dimension_1'], Weight_param['dimension_2'] = kernelShape
                 filename = 'param/_' + name.replace('/', '').replace(' ', '')[0:-2] + '.txt'
-                with open(filename, 'w') as f2:
-                    f2.write('Model_Name = ' + modelName + '\n')
-                    f2.write('Layer_Type = RELEFC\n')
-                    f2.write('Layer_Number = ' + name.split('/')[0] + '\n\n')
-                    f2.write('Input_parameter' + transform(Input_param) + '\n\n')
-                    f2.write('Output_parameter' + transform(Output_param) + '\n\n')
-                    f2.write('Weight_parameter' + transform(Weight_param))
+                write_file(filename, modelName, 'RELEFC', name.split('/')[0], Input_param, Output_param, Weight_param,
+                           dict())
 
     def modify_rnn():
         with open(rnnPath, 'r') as f:
@@ -244,24 +254,20 @@ def modify_format(modelName):
                 n_output = n_output[2:-2].split(',')
                 n_hidden = n_hidden[2:-2].split(',')
 
-                Input_param = {'input_batch': n_input[0],  'input_dim': n_input[1]}
-                Output_param = {'output_batch': n_output[0],  'output_dim': n_output[1]}
-                Hidden_param = dict(zip(['hidden_x', 'hidden_y'], [n_input[1],n_output[1]]))
+                Input_param = {'input_batch': n_input[0], 'input_dim': n_input[1]}
+                Output_param = {'output_batch': n_output[0], 'output_dim': n_output[1]}
+                Hidden_param = dict(zip(['hidden_x', 'hidden_y'], [n_input[1], n_output[1]]))
                 filename = 'param/_' + name.replace('/', '').replace(' ', '')[0:-2] + '.txt'
-                with open(filename, 'w') as f2:
-                    f2.write('Model_Name = ' + modelName + '\n')
-                    f2.write('Layer_Type = rnn_unit\n')
-                    f2.write('Layer_Number = ' + name.split('/')[-1] + '\n\n')
-                    f2.write('Input_parameter' + transform(Input_param) + '\n\n')
-                    f2.write('Output_parameter' + transform(Output_param) + '\n\n')
-                    f2.write('Hidden_parameter' + transform(Hidden_param))
+                write_file(filename, modelName, 'rnn_unit', name.split('/')[0], Input_param, Output_param, dict(),
+                           Hidden_param)
 
     modify_conv()
     modify_maxpool()
     modify_relufc()
     modify_rnn()
 
+
 shutil.rmtree('param')
 os.mkdir('param')
-extractNetwork("vgg.py", True)
-modify_format("vgg")
+extractNetwork(network_name+'.py',python_path,True)
+modify_format(network_name)
